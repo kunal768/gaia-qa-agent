@@ -27,3 +27,11 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Internal documentation (not needed in public repo)
+IMPROVEMENTS_SUMMARY.md
+QUESTION_ANALYSIS.md
+SETUP_GITHUB.md
+test_agent.py
+test_api.sh
+agent.py
