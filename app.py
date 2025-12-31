@@ -31,8 +31,14 @@ class BasicAgent:
             PythonInterpreterTool(),  # For code execution and data processing
             SpeechToTextTool(),  # For audio transcription
         ]
-        # Add system message to guide the agent
-        system_message = """You are a helpful AI agent that can answer questions using various tools.
+        # Add system prompt to guide the agent (must include placeholders)
+        system_prompt = """You are a helpful AI agent that can answer questions using various tools.
+
+Available tools:
+{{tool_descriptions}}
+
+Authorized imports:
+{{authorized_imports}}
 
 IMPORTANT INSTRUCTIONS FOR DIFFERENT TASK TYPES:
 
@@ -97,7 +103,7 @@ IMPORTANT: If a question mentions a file attachment but the file is not availabl
         self.agent = CodeAgent(
             model=self.model, 
             tools=self.tools,
-            system_message=system_message
+            system_prompt=system_prompt
         )
         # Store API URL for file downloads
         self.api_url = DEFAULT_API_URL
