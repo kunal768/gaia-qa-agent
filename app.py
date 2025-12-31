@@ -3,21 +3,199 @@ import gradio as gr
 import requests
 import inspect
 import pandas as pd
-
+import tempfile
+from pathlib import Path
 # (Keep Constants as is)
 # --- Constants ---
 DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 
-# --- Basic Agent Definition ---
-# ----- THIS IS WERE YOU CAN BUILD WHAT YOU WANT ------
+from smolagents import (
+    CodeAgent, 
+    OpenAIModel, 
+    Tool, 
+    DuckDuckGoSearchTool, 
+    VisitWebpageTool,
+    PythonInterpreterTool,
+    SpeechToTextTool
+)
+from dotenv import load_dotenv
+
 class BasicAgent:
     def __init__(self):
-        print("BasicAgent initialized.")
+        # Use gpt-4o for better performance on complex tasks
+        self.model = OpenAIModel(model="gpt-4o")
+        # Add more tools for better task handling
+        self.tools = [
+            DuckDuckGoSearchTool(), 
+            VisitWebpageTool(),
+            PythonInterpreterTool(),  # For code execution and data processing
+            SpeechToTextTool(),  # For audio transcription
+        ]
+        # Add system message to guide the agent
+        system_message = """You are a helpful AI agent that can answer questions using various tools.
+
+IMPORTANT INSTRUCTIONS FOR DIFFERENT TASK TYPES:
+
+1. REVERSED TEXT: If text appears backwards, reverse it using Python: text[::-1] or ''.join(reversed(text))
+
+2. IMAGES: 
+   - Load with: from PIL import Image; img = Image.open(file_path)
+   - For chess positions: Identify all pieces (K=King, Q=Queen, R=Rook, B=Bishop, N=Knight, P=Pawn)
+   - Analyze board state carefully and determine the best move in algebraic notation (e.g., "e4", "Nf3")
+
+3. AUDIO FILES:
+   - Use SpeechToTextTool to transcribe audio
+   - Listen carefully for specific details like ingredients, page numbers, names, etc.
+   - Extract only the requested information (e.g., just ingredients, not measurements)
+
+4. PYTHON CODE:
+   - Read the file: with open(file_path, 'r') as f: code = f.read()
+   - Execute it safely and capture the final output
+   - Return only the final numeric or string result
+
+5. EXCEL/CSV FILES:
+   - Read with pandas: df = pd.read_excel(file_path) or pd.read_csv(file_path)
+   - Filter data carefully (e.g., food vs drinks, specific categories)
+   - Perform calculations accurately
+   - Format answers as requested (e.g., USD with 2 decimals)
+
+6. WEB SEARCHES:
+   - Use DuckDuckGoSearchTool for information retrieval
+   - For Wikipedia questions, search specifically on Wikipedia
+   - For multi-step questions, break them down and search iteratively
+   - Verify information from multiple sources when possible
+
+7. YOUTUBE VIDEOS:
+   - Use VisitWebpageTool to access the video page
+   - Search for video transcripts, descriptions, or related information
+   - Use DuckDuckGoSearchTool with the video title/URL to find details
+   - Look for closed captions or transcript information
+
+8. MATHEMATICAL/LOGIC PROBLEMS:
+   - Use Python to compute step by step
+   - For operation tables, check all pairs systematically
+   - Format answers as requested (comma-separated, alphabetical order, etc.)
+
+9. COMPLEX REASONING:
+   - Break down multi-step questions
+   - Use web search to find intermediate information
+   - Verify each step before proceeding
+
+ANSWER FORMATTING:
+- Follow exact format requirements (comma-separated, alphabetical, first name only, etc.)
+- Provide only the requested information, nothing extra
+- Be precise and accurate
+- If uncertain, use tools to verify your answer
+
+IMPORTANT: If a question mentions a file attachment but the file is not available:
+- For image questions: Try to use web search to find similar information or descriptions
+- For audio questions: If transcription is not possible, use web search to find related information
+- For code questions: If code cannot be executed, try to analyze the question logically
+- For data file questions: Use web search to find similar datasets or information
+- Always provide your best answer based on available information and tools"""
+        
+        self.agent = CodeAgent(
+            model=self.model, 
+            tools=self.tools,
+            system_message=system_message
+        )
+        # Store API URL for file downloads
+        self.api_url = DEFAULT_API_URL
+    
     def __call__(self, question: str) -> str:
-        print(f"Agent received question (first 50 chars): {question[:50]}...")
-        fixed_answer = "This is a default answer."
-        print(f"Agent returning fixed answer: {fixed_answer}")
-        return fixed_answer
+        """
+        Make the agent callable. This method handles file downloads internally
+        by parsing the question for file references or task context.
+        
+        Args:
+            question: The question to answer (may contain file references)
+        """
+        return self.run(question)
+    
+    def run(self, question: str) -> str:
+        """
+        Run the agent on a question. Automatically detects question type and enhances
+        with appropriate instructions for the agent.
+        
+        Args:
+            question: The question to answer
+        """
+        # Enhance question with instructions based on content analysis
+        enhanced_question = question
+        question_lower = question.lower()
+        
+        # Check for reversed text (starts with period, ends with capital letter)
+        if question.strip().startswith('.') and len(question) > 20:
+            enhanced_question = f"""{question}
+
+NOTE: This text appears to be reversed. Please reverse it first using Python:
+reversed_text = question[::-1] or ''.join(reversed(question))
+Then answer based on the reversed text."""
+        
+        # Check for YouTube URLs
+        elif 'youtube.com' in question or 'youtu.be' in question:
+            enhanced_question = f"""{question}
+
+NOTE: This question involves a YouTube video. Use VisitWebpageTool to access the video page,
+or use DuckDuckGoSearchTool to search for information about this video, transcripts, or descriptions."""
+        
+        # Check for image/chess questions
+        elif 'image' in question_lower or 'chess' in question_lower or 'position' in question_lower:
+            enhanced_question = f"""{question}
+
+NOTE: This question involves an image file (possibly a chess position). 
+If you can access the file, load it with: from PIL import Image; img = Image.open(file_path)
+For chess positions, identify all pieces (K=King, Q=Queen, R=Rook, B=Bishop, N=Knight, P=Pawn) 
+and determine the best move in algebraic notation (e.g., "e4", "Nf3").
+If the file is not available, try to use web search to find related information."""
+        
+        # Check for audio questions
+        elif 'audio' in question_lower or 'mp3' in question_lower or 'recording' in question_lower or 'voice memo' in question_lower or 'listen' in question_lower:
+            enhanced_question = f"""{question}
+
+NOTE: This question involves an audio file. Use SpeechToTextTool to transcribe if the file is available.
+Listen carefully for specific details like ingredients, page numbers, names, etc.
+Extract only the requested information (e.g., just ingredients, not measurements).
+If the file is not available, try to use web search to find related information."""
+        
+        # Check for Python code questions
+        elif 'python code' in question_lower or ('code' in question_lower and 'python' in question_lower) or 'numeric output' in question_lower:
+            enhanced_question = f"""{question}
+
+NOTE: This question involves a Python code file. If you can access the file, read and execute it:
+with open(file_path, 'r') as f: code = f.read()
+Then execute the code and provide the final output or result.
+If the file is not available, try to analyze the question logically."""
+        
+        # Check for Excel/spreadsheet questions
+        elif 'excel' in question_lower or 'xlsx' in question_lower or 'spreadsheet' in question_lower or ('sales' in question_lower and 'file' in question_lower):
+            enhanced_question = f"""{question}
+
+NOTE: This question involves an Excel/spreadsheet file. If you can access the file, read it with pandas:
+df = pd.read_excel(file_path) or pd.read_csv(file_path)
+Filter data carefully (e.g., food vs drinks, specific categories) and perform calculations accurately.
+Format answers as requested (e.g., USD with 2 decimals).
+If the file is not available, try to use web search to find related data or information."""
+        
+        # Check for mathematical/logic problems
+        elif 'table' in question_lower and ('operation' in question_lower or '*' in question) or 'commutative' in question_lower:
+            enhanced_question = f"""{question}
+
+NOTE: This is a mathematical/logic problem. Use Python to compute step by step.
+For operation tables, check all pairs systematically.
+Format answers as requested (comma-separated, alphabetical order, etc.)."""
+        
+        # Check for Wikipedia/research questions
+        elif 'wikipedia' in question_lower or 'nominated' in question_lower or 'paper' in question_lower or 'article' in question_lower:
+            enhanced_question = f"""{question}
+
+NOTE: This is a research question. Use DuckDuckGoSearchTool to find information.
+For Wikipedia questions, search specifically on Wikipedia.
+For multi-step questions, break them down and search iteratively.
+Verify information from multiple sources when possible."""
+        
+        # Run the agent with enhanced question
+        return self.agent.run(enhanced_question)
 
 def run_and_submit_all( profile: gr.OAuthProfile | None):
     """
@@ -79,6 +257,7 @@ def run_and_submit_all( profile: gr.OAuthProfile | None):
         if not task_id or question_text is None:
             print(f"Skipping item with missing task_id or question: {item}")
             continue
+        
         try:
             submitted_answer = agent(question_text)
             answers_payload.append({"task_id": task_id, "submitted_answer": submitted_answer})
@@ -171,26 +350,27 @@ with gr.Blocks() as demo:
         outputs=[status_output, results_table]
     )
 
-if __name__ == "__main__":
-    print("\n" + "-"*30 + " App Starting " + "-"*30)
-    # Check for SPACE_HOST and SPACE_ID at startup for information
-    space_host_startup = os.getenv("SPACE_HOST")
-    space_id_startup = os.getenv("SPACE_ID") # Get SPACE_ID at startup
+    if __name__ == "__main__":
+        print("\n" + "-"*30 + " App Starting " + "-"*30)
+        load_dotenv()
+        # Check for SPACE_HOST and SPACE_ID at startup for information
+        space_host_startup = os.getenv("SPACE_HOST")
+        space_id_startup = os.getenv("SPACE_ID") # Get SPACE_ID at startup
 
-    if space_host_startup:
-        print(f"✅ SPACE_HOST found: {space_host_startup}")
-        print(f"   Runtime URL should be: https://{space_host_startup}.hf.space")
-    else:
-        print("ℹ️  SPACE_HOST environment variable not found (running locally?).")
+        if space_host_startup:
+            print(f"✅ SPACE_HOST found: {space_host_startup}")
+            print(f"   Runtime URL should be: https://{space_host_startup}.hf.space")
+        else:
+            print("ℹ️  SPACE_HOST environment variable not found (running locally?).")
 
-    if space_id_startup: # Print repo URLs if SPACE_ID is found
-        print(f"✅ SPACE_ID found: {space_id_startup}")
-        print(f"   Repo URL: https://huggingface.co/spaces/{space_id_startup}")
-        print(f"   Repo Tree URL: https://huggingface.co/spaces/{space_id_startup}/tree/main")
-    else:
-        print("ℹ️  SPACE_ID environment variable not found (running locally?). Repo URL cannot be determined.")
+        if space_id_startup: # Print repo URLs if SPACE_ID is found
+            print(f"✅ SPACE_ID found: {space_id_startup}")
+            print(f"   Repo URL: https://huggingface.co/spaces/{space_id_startup}")
+            print(f"   Repo Tree URL: https://huggingface.co/spaces/{space_id_startup}/tree/main")
+        else:
+            print("ℹ️  SPACE_ID environment variable not found (running locally?). Repo URL cannot be determined.")
 
-    print("-"*(60 + len(" App Starting ")) + "\n")
+        print("-"*(60 + len(" App Starting ")) + "\n")
 
-    print("Launching Gradio Interface for Basic Agent Evaluation...")
-    demo.launch(debug=True, share=False)
+        print("Launching Gradio Interface for Basic Agent Evaluation...")
+        demo.launch(debug=True, share=False)
