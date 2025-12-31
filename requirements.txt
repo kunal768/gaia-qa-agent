@@ -1,2 +1,8 @@
 gradio
 requests
+smolagents
+python-dotenv
+pandas
+openpyxl
+pillow
+PyPDF2
