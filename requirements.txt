@@ -7,3 +7,4 @@ openpyxl
 pillow
 PyPDF2
 ddgs
+transformers
