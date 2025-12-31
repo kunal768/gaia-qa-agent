@@ -1,8 +1,10 @@
-gradio
 requests
-smolagents
+smolagents[openai]
 python-dotenv
 pandas
 openpyxl
 pillow
 PyPDF2
+ddgs
+transformers
+smolagents[transformers]
