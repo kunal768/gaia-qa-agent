@@ -1,6 +1,6 @@
 gradio
 requests
-smolagents
+smolagents[openai]
 python-dotenv
 pandas
 openpyxl
