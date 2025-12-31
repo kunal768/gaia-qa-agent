@@ -16,7 +16,8 @@ from smolagents import (
     DuckDuckGoSearchTool, 
     VisitWebpageTool,
     PythonInterpreterTool,
-    SpeechToTextTool
+    SpeechToTextTool,
+    PromptTemplates
 )
 from dotenv import load_dotenv
 
@@ -31,15 +32,8 @@ class BasicAgent:
             PythonInterpreterTool(),  # For code execution and data processing
             SpeechToTextTool(),  # For audio transcription
         ]
-        # Add system prompt to guide the agent (must include placeholders)
-        system_prompt = """You are a helpful AI agent that can answer questions using various tools.
-
-Available tools:
-{{tool_descriptions}}
-
-Authorized imports:
-{{authorized_imports}}
-
+        # Create custom system prompt with required placeholders
+        additional_instructions = """
 IMPORTANT INSTRUCTIONS FOR DIFFERENT TASK TYPES:
 
 1. REVERSED TEXT: If text appears backwards, reverse it using Python: text[::-1] or ''.join(reversed(text))
@@ -98,12 +92,17 @@ IMPORTANT: If a question mentions a file attachment but the file is not availabl
 - For audio questions: If transcription is not possible, use web search to find related information
 - For code questions: If code cannot be executed, try to analyze the question logically
 - For data file questions: Use web search to find similar datasets or information
-- Always provide your best answer based on available information and tools"""
+- Always provide your best answer based on available information and tools
+"""
+        
+        # Get default prompt templates and enhance system prompt
+        prompt_templates = PromptTemplates()
+        custom_system_prompt = prompt_templates.system_prompt + additional_instructions
         
         self.agent = CodeAgent(
             model=self.model, 
             tools=self.tools,
-            system_prompt=system_prompt
+            prompt_templates=PromptTemplates(system_prompt=custom_system_prompt)
         )
         # Store API URL for file downloads
         self.api_url = DEFAULT_API_URL
