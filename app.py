@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 class BasicAgent:
     def __init__(self):
         # Use gpt-4o for better performance on complex tasks
-        self.model = OpenAIModel(model="gpt-4o")
+        self.model = OpenAIModel(model_id="gpt-4o")
         # Add more tools for better task handling
         self.tools = [
             DuckDuckGoSearchTool(), 
