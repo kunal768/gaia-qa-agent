@@ -16,8 +16,7 @@ from smolagents import (
     DuckDuckGoSearchTool, 
     VisitWebpageTool,
     PythonInterpreterTool,
-    SpeechToTextTool,
-    PromptTemplates
+    SpeechToTextTool
 )
 from dotenv import load_dotenv
 
@@ -32,77 +31,11 @@ class BasicAgent:
             PythonInterpreterTool(),  # For code execution and data processing
             SpeechToTextTool(),  # For audio transcription
         ]
-        # Create custom system prompt with required placeholders
-        additional_instructions = """
-IMPORTANT INSTRUCTIONS FOR DIFFERENT TASK TYPES:
-
-1. REVERSED TEXT: If text appears backwards, reverse it using Python: text[::-1] or ''.join(reversed(text))
-
-2. IMAGES: 
-   - Load with: from PIL import Image; img = Image.open(file_path)
-   - For chess positions: Identify all pieces (K=King, Q=Queen, R=Rook, B=Bishop, N=Knight, P=Pawn)
-   - Analyze board state carefully and determine the best move in algebraic notation (e.g., "e4", "Nf3")
-
-3. AUDIO FILES:
-   - Use SpeechToTextTool to transcribe audio
-   - Listen carefully for specific details like ingredients, page numbers, names, etc.
-   - Extract only the requested information (e.g., just ingredients, not measurements)
-
-4. PYTHON CODE:
-   - Read the file: with open(file_path, 'r') as f: code = f.read()
-   - Execute it safely and capture the final output
-   - Return only the final numeric or string result
-
-5. EXCEL/CSV FILES:
-   - Read with pandas: df = pd.read_excel(file_path) or pd.read_csv(file_path)
-   - Filter data carefully (e.g., food vs drinks, specific categories)
-   - Perform calculations accurately
-   - Format answers as requested (e.g., USD with 2 decimals)
-
-6. WEB SEARCHES:
-   - Use DuckDuckGoSearchTool for information retrieval
-   - For Wikipedia questions, search specifically on Wikipedia
-   - For multi-step questions, break them down and search iteratively
-   - Verify information from multiple sources when possible
-
-7. YOUTUBE VIDEOS:
-   - Use VisitWebpageTool to access the video page
-   - Search for video transcripts, descriptions, or related information
-   - Use DuckDuckGoSearchTool with the video title/URL to find details
-   - Look for closed captions or transcript information
-
-8. MATHEMATICAL/LOGIC PROBLEMS:
-   - Use Python to compute step by step
-   - For operation tables, check all pairs systematically
-   - Format answers as requested (comma-separated, alphabetical order, etc.)
-
-9. COMPLEX REASONING:
-   - Break down multi-step questions
-   - Use web search to find intermediate information
-   - Verify each step before proceeding
-
-ANSWER FORMATTING:
-- Follow exact format requirements (comma-separated, alphabetical, first name only, etc.)
-- Provide only the requested information, nothing extra
-- Be precise and accurate
-- If uncertain, use tools to verify your answer
-
-IMPORTANT: If a question mentions a file attachment but the file is not available:
-- For image questions: Try to use web search to find similar information or descriptions
-- For audio questions: If transcription is not possible, use web search to find related information
-- For code questions: If code cannot be executed, try to analyze the question logically
-- For data file questions: Use web search to find similar datasets or information
-- Always provide your best answer based on available information and tools
-"""
         
-        # Get default prompt templates and enhance system prompt
-        prompt_templates = PromptTemplates()
-        custom_system_prompt = prompt_templates.system_prompt + additional_instructions
-        
+        # Initialize CodeAgent with default prompts (will enhance questions in run method)
         self.agent = CodeAgent(
             model=self.model, 
-            tools=self.tools,
-            prompt_templates=PromptTemplates(system_prompt=custom_system_prompt)
+            tools=self.tools
         )
         # Store API URL for file downloads
         self.api_url = DEFAULT_API_URL
@@ -183,7 +116,7 @@ Format answers as requested (e.g., USD with 2 decimals).
 If the file is not available, try to use web search to find related data or information."""
         
         # Check for mathematical/logic problems
-        elif 'table' in question_lower and ('operation' in question_lower or '*' in question) or 'commutative' in question_lower:
+        elif ('table' in question_lower and ('operation' in question_lower or '*' in question)) or 'commutative' in question_lower:
             enhanced_question = f"""{question}
 
 NOTE: This is a mathematical/logic problem. Use Python to compute step by step.
