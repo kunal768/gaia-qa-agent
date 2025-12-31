@@ -6,3 +6,4 @@ pandas
 openpyxl
 pillow
 PyPDF2
+ddgs
