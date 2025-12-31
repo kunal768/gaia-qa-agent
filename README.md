@@ -1,4 +1,4 @@
-# HuggingFace Agents Course - Final Assignment Solution
+# Gaia QA Agent
 
 A robust CLI-based AI agent solution for the HuggingFace Agents Course Unit 4 final assignment. This agent successfully handles diverse tasks including web searches, image analysis, audio transcription, code execution, and data processing.
 
@@ -31,8 +31,8 @@ A robust CLI-based AI agent solution for the HuggingFace Agents Course Unit 4 fi
 
 1. Clone the repository:
 ```bash
-git clone <your-repo-url>
-cd Final_Assignment_Template
+git clone https://github.com/YOUR_USERNAME/gaia-qa-agent.git
+cd gaia-qa-agent
 ```
 
 2. Install dependencies:
